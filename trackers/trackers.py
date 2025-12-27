@@ -1,12 +1,17 @@
 from abc import ABC, abstractmethod
+from copy import deepcopy
+
 import cv2
 import numpy as np
-from misc_functions import convert_image
+from misc_functions.utils import convert_image
 
 
 class Tracker(ABC):
     def __init__(self):
         self._active = True
+        self._valid = False
+        self.tracked_coordinates = {}
+        self.tracked_coordinates_with_frame_index = {}
 
     @property
     def active(self):
@@ -16,23 +21,68 @@ class Tracker(ABC):
     def active(self, val):
         self._active = val
 
+    @property
+    def is_valid(self):
+        return len(self.tracked_coordinates) != 0
+
     @staticmethod
     def factory(method):
         if method == "optical_flow":
             return OpticalFlow
         if method == "tracker":
             raise NotImplementedError
+        if method == "empty":
+            raise EmptyTracker
         else:
             raise ValueError(f"'{method}' is not an option")
 
     @abstractmethod
-    def initialize_tracker(self, image): ...
+    def initialize_tracker(self, image):
+        ...
 
     @abstractmethod
-    def update_tracker(self, image): ...
+    def update_tracker(self, image, index):
+        ...
 
     @abstractmethod
-    def fix_roi_offset(self, x, y, w, h): ...
+    def fix_roi_offset(self, x, y, w, h):
+        ...
+
+    def sort_tracker_data(self):
+        self.tracked_coordinates_with_frame_index = deepcopy(self.tracked_coordinates)
+        self.tracked_coordinates = dict(sorted(self.tracked_coordinates.items()))
+        self.tracked_coordinates = np.array(
+            list(self.tracked_coordinates.values())
+        ).squeeze()
+
+    def get_coordinate_at_index(self, index):
+        return self.tracked_coordinates[index]
+
+    def convolve_smooth(self, window_size, mode="valid"):
+        kernel = np.ones(window_size) / window_size
+
+        pad_x = np.pad(self.tracked_coordinates[..., 0], window_size // 2, mode="edge")
+        pad_y = np.pad(self.tracked_coordinates[..., 1], window_size // 2, mode="edge")
+
+        smooth_x = np.convolve(pad_x, kernel, mode=mode)
+        smooth_y = np.convolve(pad_y, kernel, mode=mode)
+
+        smoothed = np.column_stack([smooth_x, smooth_y])
+        # self.tracked_coordinates = smoothed
+        return smoothed
+
+
+
+
+class EmptyTracker(Tracker):
+    def __init__(self):
+        super().__init__()
+
+    def initialize_tracker(self, image, **kwargs): ...
+
+    def fix_roi_offset(self, x, y, w, h, **kwargs): ...
+
+    def update_tracker(self, image, index): ...
 
 
 class ColorMasking(Tracker):
@@ -43,7 +93,7 @@ class ColorMasking(Tracker):
     def initialize_tracker(self, image): ...
 
     @abstractmethod
-    def update_tracker(self, image): ...
+    def update_tracker(self, image, index): ...
 
     @abstractmethod
     def fix_roi_offset(self, x, y, w, h): ...
@@ -86,7 +136,7 @@ class OpticalFlow(Tracker):
     def fix_roi_offset(self, x, y, w, h, **kwargs):
         self.p0 = self.p0 + np.array([x, y])
 
-    def update_tracker(self, image):
+    def update_tracker(self, image, index):
         image = convert_image(image, "gray")
         p1, st, err = cv2.calcOpticalFlowPyrLK(
             self.old_gray,
@@ -106,4 +156,7 @@ class OpticalFlow(Tracker):
 
         self.old_gray = image
         self.p0 = p1
-        return good_points
+
+        good_points_mean = np.mean(good_points, axis=0, dtype=np.int32)
+        self.tracked_coordinates[index] = good_points_mean
+        return good_points_mean  # return for debugging purposes
