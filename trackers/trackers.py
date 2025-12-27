@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from copy import deepcopy
+from typing import Any
 
 import cv2
 import numpy as np
@@ -11,7 +11,7 @@ class Tracker(ABC):
         self._active = True
         self._valid = False
         self.tracked_coordinates = {}
-        self.tracked_coordinates_with_frame_index = {}
+        self.requires_roi = True
 
     @property
     def active(self):
@@ -31,25 +31,28 @@ class Tracker(ABC):
             return OpticalFlow
         if method == "tracker":
             raise NotImplementedError
+        if method == "color_masking":
+            return ColorMasking
         if method == "empty":
             raise EmptyTracker
         else:
             raise ValueError(f"'{method}' is not an option")
 
     @abstractmethod
-    def initialize_tracker(self, image):
-        ...
+    def initialize_tracker(self, image): ...
 
     @abstractmethod
-    def update_tracker(self, image, index):
-        ...
+    def update_tracker(self, image, index): ...
 
     @abstractmethod
-    def fix_roi_offset(self, x, y, w, h):
-        ...
+    def fix_roi_offset(self, x, y, w, h): ...
+
+    @abstractmethod
+    def display_tracking_solution(
+        self, window_name, image: np.ndarray, solution: Any, **kwargs
+    ): ...
 
     def sort_tracker_data(self):
-        self.tracked_coordinates_with_frame_index = deepcopy(self.tracked_coordinates)
         self.tracked_coordinates = dict(sorted(self.tracked_coordinates.items()))
         self.tracked_coordinates = np.array(
             list(self.tracked_coordinates.values())
@@ -72,8 +75,6 @@ class Tracker(ABC):
         return smoothed
 
 
-
-
 class EmptyTracker(Tracker):
     def __init__(self):
         super().__init__()
@@ -83,6 +84,8 @@ class EmptyTracker(Tracker):
     def fix_roi_offset(self, x, y, w, h, **kwargs): ...
 
     def update_tracker(self, image, index): ...
+
+    def display_tracking_solution(self, window_name, image, solution, **kwargs): ...
 
 
 class ColorMasking(Tracker):
@@ -136,8 +139,10 @@ class OpticalFlow(Tracker):
     def fix_roi_offset(self, x, y, w, h, **kwargs):
         self.p0 = self.p0 + np.array([x, y])
 
-    def update_tracker(self, image, index):
-        image = convert_image(image, "gray")
+    def update_tracker(self, index, **kwargs):
+        image = kwargs["gray_image"]
+        assert len(image.shape) == 2
+
         p1, st, err = cv2.calcOpticalFlowPyrLK(
             self.old_gray,
             image,
@@ -160,3 +165,13 @@ class OpticalFlow(Tracker):
         good_points_mean = np.mean(good_points, axis=0, dtype=np.int32)
         self.tracked_coordinates[index] = good_points_mean
         return good_points_mean  # return for debugging purposes
+
+    def display_tracking_solution(
+        self, window_name, image: np.ndarray, solution: Any, **kwargs
+    ):
+        for coordinate in solution:
+            x, y = map(int, coordinate.ravel())
+            cv2.circle(image, (x, y), 5, (0, 255, 0), 5)
+
+        cv2.imshow(window_name, image)
+        cv2.waitKey(1)
