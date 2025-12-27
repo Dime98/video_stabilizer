@@ -91,15 +91,66 @@ class EmptyTracker(Tracker):
 class ColorMasking(Tracker):
     def __init__(self):
         super().__init__()
+        self.requires_roi = False
+        self.lower, self.upper = [], []
 
-    @abstractmethod
-    def initialize_tracker(self, image): ...
+    def set_bounds(self, lower, upper):
+        self.lower = lower
+        self.upper = upper
 
-    @abstractmethod
-    def update_tracker(self, image, index): ...
+    def initialize_tracker(self, image, **kwargs): ...
 
-    @abstractmethod
+    def get_mask(self, image):
+        # if self.lower == [] or self.upper == []:
+        #     raise ValueError(f"lower or upped bounds are not set\n{self.lower=} {self.upper=} ")
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+        lower = np.array(self.lower)
+        upper = np.array(self.upper)
+        return cv2.inRange(hsv, lower, upper)
+
+    def get_contours(self, bw_image: np.ndarray, min_area: int = 30):
+        contours, hierarchy = cv2.findContours(
+            bw_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
+        contours = [cnt for cnt in contours if cv2.contourArea(cnt) >= min_area]
+        return contours
+
+    def get_contour_center(self, contours):
+        mean_coordinates = []
+        for contour in contours:
+            print(contour, contour.shape)
+            points = contour.reshape(-1, 2)
+            mean_x = int(np.mean(points[:, 0]))
+            mean_y = int(np.mean(points[:, 1]))
+            mean_coordinates.append([mean_x, mean_y])
+        return np.mean(mean_coordinates, axis=0)
+
+    def update_tracker(self, index, **kwargs):
+        mask = self.get_mask(kwargs["image"])
+
+        contours = self.get_contours(mask)
+        contour_center = self.get_contour_center(contours)
+        self.tracked_coordinates[index] = contour_center
+        return contour_center
+
     def fix_roi_offset(self, x, y, w, h): ...
+
+    def display_tracking_solution(
+        self, window_name, image: np.ndarray, solution: Any, **kwargs
+    ):
+        mask = self.get_mask(image)
+
+        contours = self.get_contours(mask)
+        cv2.drawContours(image, contours, contourIdx=-1, color=(0, 255, 0), thickness=2)
+
+        cx, cy = int(solution[0]), int(solution[1])
+        cv2.circle(image, (cx, cy), 40, (0, 0, 255), 3)
+        cv2.circle(image, (cx, cy), 5, (0, 0, 255), -3)
+
+        image = cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)])
+        cv2.imshow(window_name, image)
+        cv2.waitKey(1)
 
 
 class OpticalFlow(Tracker):

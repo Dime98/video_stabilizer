@@ -80,7 +80,7 @@ class ViewColorMasking:
 
             # cv2.imshow("color maksing view", cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]))
             cv2.imshow(
-                self.window_name,
+                "color mask viewer",
                 cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]),
             )
 
@@ -91,6 +91,7 @@ class ViewColorMasking:
                 self.set_initial_hsv()
 
         cv2.destroyWindow(self.window_name)
+        cv2.destroyWindow("color mask viewer")
         return lower, upper
 
 
