@@ -39,18 +39,18 @@ class Tracker(ABC):
             raise ValueError(f"'{method}' is not an option")
 
     @abstractmethod
-    def initialize_tracker(self, image): ...
+    def initialize_tracker(self, **kwargs):
+        ...
 
     @abstractmethod
-    def update_tracker(self, image, index): ...
-
-    @abstractmethod
-    def fix_roi_offset(self, x, y, w, h): ...
+    def update_tracker(self, image, index):
+        ...
 
     @abstractmethod
     def display_tracking_solution(
-        self, window_name, image: np.ndarray, solution: Any, **kwargs
-    ): ...
+            self, window_name, image: np.ndarray, solution: Any, **kwargs
+    ):
+        ...
 
     def sort_tracker_data(self):
         self.tracked_coordinates = dict(sorted(self.tracked_coordinates.items()))
@@ -71,7 +71,6 @@ class Tracker(ABC):
         smooth_y = np.convolve(pad_y, kernel, mode=mode)
 
         smoothed = np.column_stack([smooth_x, smooth_y])
-        # self.tracked_coordinates = smoothed
         return smoothed
 
 
@@ -79,7 +78,7 @@ class EmptyTracker(Tracker):
     def __init__(self):
         super().__init__()
 
-    def initialize_tracker(self, image, **kwargs): ...
+    def initialize_tracker(self, **kwargs): ...
 
     def fix_roi_offset(self, x, y, w, h, **kwargs): ...
 
@@ -98,7 +97,7 @@ class ColorMasking(Tracker):
         self.lower = lower
         self.upper = upper
 
-    def initialize_tracker(self, image, **kwargs): ...
+    def initialize_tracker(self, **kwargs): ...
 
     def get_mask(self, image):
         # if self.lower == [] or self.upper == []:
@@ -119,7 +118,6 @@ class ColorMasking(Tracker):
     def get_contour_center(self, contours):
         mean_coordinates = []
         for contour in contours:
-            print(contour, contour.shape)
             points = contour.reshape(-1, 2)
             mean_x = int(np.mean(points[:, 0]))
             mean_y = int(np.mean(points[:, 1]))
@@ -137,7 +135,7 @@ class ColorMasking(Tracker):
     def fix_roi_offset(self, x, y, w, h): ...
 
     def display_tracking_solution(
-        self, window_name, image: np.ndarray, solution: Any, **kwargs
+            self, window_name, image: np.ndarray, solution: Any, **kwargs
     ):
         mask = self.get_mask(image)
 
@@ -164,7 +162,7 @@ class OpticalFlow(Tracker):
             self.feature_params = feature_params
 
         self.lk_params = dict(
-            winSize=(15, 15),
+            winSize=(25, 25),
             maxLevel=2,
             criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03),
         )
@@ -179,15 +177,20 @@ class OpticalFlow(Tracker):
     def old_gray(self, val):
         self._old_gray = val
 
-    def initialize_tracker(self, image, **kwargs):
-        image = convert_image(image, "gray")
-        self.p0 = cv2.goodFeaturesToTrack(image, mask=None, **self.feature_params)
+    def initialize_tracker(self, **kwargs):
+        x, y, w, h = kwargs['roi']
+        frame = kwargs['frame']
+
+        roi_image = frame[y: y + h, x: x + w]
+        roi_image = convert_image(roi_image, "gray")
+
+        init_tracker_image = convert_image(roi_image, "gray")
+        self.p0 = cv2.goodFeaturesToTrack(init_tracker_image, mask=None, **self.feature_params)
         if self.p0 is None:
             print("cannot find goodFeaturesToTrack in this roi")
             return
-        self.old_gray = convert_image(kwargs["old_gray"], "gray")
+        self.old_gray = convert_image(frame, "gray")
 
-    def fix_roi_offset(self, x, y, w, h, **kwargs):
         self.p0 = self.p0 + np.array([x, y])
 
     def update_tracker(self, index, **kwargs):
@@ -218,11 +221,14 @@ class OpticalFlow(Tracker):
         return good_points_mean  # return for debugging purposes
 
     def display_tracking_solution(
-        self, window_name, image: np.ndarray, solution: Any, **kwargs
+            self, window_name, image: np.ndarray, solution: Any, **kwargs
     ):
         for coordinate in solution:
             x, y = map(int, coordinate.ravel())
             cv2.circle(image, (x, y), 5, (0, 255, 0), 5)
+
+        cv2.imshow(window_name, image)
+        cv2.waitKey(1)
 
         cv2.imshow(window_name, image)
         cv2.waitKey(1)

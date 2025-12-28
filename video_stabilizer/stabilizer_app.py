@@ -81,6 +81,7 @@ class StabilizerApplication:
 
         self.active_tracker: Tracker = EmptyTracker()
         self.debug_display = False
+        self.debug_display = True
 
         drawing_properties = DrawingRelatedProperties.from_video_metadate(
             self.video_metadata
@@ -95,7 +96,8 @@ class StabilizerApplication:
         self.video_renderer = VideoRenderer(
             video_metadata=self.video_metadata,
             display_manager=self.display,
-            fourcc="XVID",
+            # fourcc="XVID",
+            fourcc="MJPG",
         )
 
         self.keybindings = InputHandler(
@@ -163,17 +165,14 @@ class StabilizerApplication:
         self.run_tracking(color_mask_tracker)
 
     def run_tracking(self, tracker):
-        init_tracker_image = self.display.get_current_frame()
-        x, y, w, h = 0, 0, 0, 0  # placeholder for trackers that don't use roi
+        roi = 0, 0, 0, 0  # placeholder for trackers that don't use roi
 
         if tracker.requires_roi:
             x, y, w, h = self.display.select_roi()
+            roi = x, y, w, h
             if not all([x, y, w, h]):
                 print("[-] roi not set")
                 return
-            roi_image = self.display.get_current_frame()[y : y + h, x : x + w]
-            roi_image = convert_image(roi_image, "gray")
-            init_tracker_image = roi_image
 
         self.display.dim_display_window()
 
@@ -186,12 +185,11 @@ class StabilizerApplication:
         print(f"{forward_range =}")
         print(f"{backward_range=}")
 
-        old_frame = np.copy(self.display.get_current_frame())
+        frame = np.copy(self.display.get_current_frame())
 
-        tracker.initialize_tracker(init_tracker_image, old_gray=old_frame)
-        tracker.fix_roi_offset(x, y, w, h)
+        tracker.initialize_tracker(frame=frame, roi=roi)
 
-        degug_window_name = "tracking solution"
+        debug_window_name = "tracking solution"
         for range_set in [forward_range, backward_range]:
             for index in range_set:
                 image_for_tracking = np.copy(self.frames[index])
@@ -208,11 +206,11 @@ class StabilizerApplication:
 
                 if self.debug_display:
                     tracker.display_tracking_solution(
-                        degug_window_name, debug_display_frame, coordinates
+                        debug_window_name, debug_display_frame, coordinates
                     )
 
         if self.debug_display:
-            cv2.destroyWindow(degug_window_name)
+            cv2.destroyWindow(debug_window_name)
 
         missing_frames = np.setdiff1d(
             np.arange(self.video_metadata.frames_count),
