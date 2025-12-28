@@ -10,10 +10,10 @@ from video_stabilizer.video.video_metadata import VideoMetadata
 
 class VideoRenderer:
     def __init__(
-        self,
-        video_metadata: VideoMetadata,
-        display_manager: DisplayManager,
-        fourcc: str = "FFV1",
+            self,
+            video_metadata: VideoMetadata,
+            display_manager: DisplayManager,
+            fourcc: str = "FFV1",
     ):
         self.display_manager = display_manager
         self.video_metadata = video_metadata
@@ -21,6 +21,7 @@ class VideoRenderer:
         self.fourcc_mapping = {
             "FFV1": ".avi",
             "XVID": ".mp4",
+            "MJPG": ".avi",
         }
         if not self.fourcc_mapping.get(fourcc):
             raise ValueError(
@@ -57,3 +58,5 @@ class VideoRenderer:
 
         video_writer.release()
         cap.release()
+
+        print(f"\n-- done rendering to '{output_video_path}' --\n")

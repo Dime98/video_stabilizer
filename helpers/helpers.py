@@ -1,25 +1,46 @@
 import cv2
 import numpy as np
+from utils import rescale
+
+from video_stabilizer.video.video_metadata import VideoMetadata
 
 
 class ViewColorMasking:
-    def __init__(self):
-        self.h_min, self.h_max = None, None
-        self.s_min, self.s_max = None, None
-        self.v_min, self.v_max = None, None
-        self.set_initial_hsv()
+    def __init__(
+        self,
+        video_metadata: VideoMetadata,
+        frames: list[np.ndarray] | None = None,
+        rescale_factor: float | None = None,
+    ):
+        self.index = 0
+        self.frames = frames
+        self.video_metadata = video_metadata
+
+        self.h_min, self.h_max = 0, 179
+        self.s_min, self.s_max = 0, 255
+        self.v_min, self.v_max = 0, 255
 
         self.window_name = "ViewColorMasking"
+        self.rescale_factor = rescale_factor
 
-    def set_initial_hsv(self):
-        self.h_min = 0
-        self.h_max = 179
-        self.s_min = 0
-        self.s_max = 255
-        self.v_min = 0
-        self.v_max = 255
+    def reset_sliders(self):
+        cv2.setTrackbarPos("h_min", self.window_name, 0)
+        cv2.setTrackbarPos("h_max", self.window_name, 170)
+        cv2.setTrackbarPos("s_min", self.window_name, 0)
+        cv2.setTrackbarPos("s_max", self.window_name, 255)
+        cv2.setTrackbarPos("v_min", self.window_name, 0)
+        cv2.setTrackbarPos("v_max", self.window_name, 255)
+
+    def on_change(self, value):
+        self.index = value
 
     def create_sliders(self):
+        time_line_max = (
+            0 if self.frames is None else self.video_metadata.frames_count - 1
+        )
+        cv2.createTrackbar("", self.window_name, 0, 1, self.on_change)
+        cv2.setTrackbarMax("", self.window_name, time_line_max)
+
         cv2.createTrackbar(
             "h_min", self.window_name, self.h_min, 179, lambda *args: None
         )
@@ -53,17 +74,17 @@ class ViewColorMasking:
 
         return cv2.inRange(hsv, lower, upper)
 
-    def view(self, image):
-        raw_image = np.copy(image)
-
+    def view(self, image=None):
         cv2.namedWindow(self.window_name)
         # cv2.resizeWindow(self._timeline, int(self._monitor_width * 0.8), 100)
         self.create_sliders()
 
-        lower, upper = [], []
+        if self.frames is None:
+            self.frames = [image]
 
+        return_value = None
         while True:
-            image = np.copy(raw_image)
+            image = np.copy(self.frames[self.index])
 
             self.h_min = cv2.getTrackbarPos("h_min", self.window_name)
             self.s_min = cv2.getTrackbarPos("s_min", self.window_name)
@@ -78,21 +99,26 @@ class ViewColorMasking:
             mask = self.mask(image, lower, upper)
             image[mask == 0] = (0, 0, 0)
 
-            # cv2.imshow("color maksing view", cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]))
-            cv2.imshow(
-                "color mask viewer",
-                cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]),
+            concatenated_images = cv2.hconcat(
+                [image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]
             )
+            if self.rescale_factor:
+                concatenated_images = rescale(concatenated_images, self.rescale_factor)
+            cv2.imshow("color mask viewer", concatenated_images)
 
             key = cv2.waitKey(10)
             if key in [27, ord("q")]:
+                return_value = None
+                break
+            if key in [13, 32]:  # 13: enter, 32: space
+                return_value = lower, upper
                 break
             if key in [ord("r"), ord("R")]:
-                self.set_initial_hsv()
+                self.reset_sliders()
 
         cv2.destroyWindow(self.window_name)
         cv2.destroyWindow("color mask viewer")
-        return lower, upper
+        return return_value
 
 
 class GoodFeaturesViewer:
