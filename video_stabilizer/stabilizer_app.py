@@ -138,7 +138,10 @@ class StabilizerApplication:
         cv2.setTrackbarPos("lock_axis", self.display.timeline, current_lock_axis)
 
     def start_tracker_method(self, *args, **kwargs):
-        raise NotImplementedError
+        print("\n-- cv2 tracker --")
+        tracker_class = Tracker.factory("tracker")
+        tracker = tracker_class()
+        self.run_tracking(tracker)
 
     def start_optical_flow_tracking(self, *args, **kwargs):
         print("\n-- optical flow --")

@@ -30,7 +30,7 @@ class Tracker(ABC):
         if method == "optical_flow":
             return OpticalFlow
         if method == "tracker":
-            raise NotImplementedError
+            return CV2Tracker
         if method == "color_masking":
             return ColorMasking
         if method == "empty":
@@ -229,6 +229,37 @@ class OpticalFlow(Tracker):
 
         cv2.imshow(window_name, image)
         cv2.waitKey(1)
+
+
+class CV2Tracker(Tracker):
+    def __init__(self):
+        super().__init__()
+        self.tracker = None
+
+    def initialize_tracker(self, **kwargs):
+        bbox = kwargs['roi']
+        frame = kwargs['frame']
+
+        self.tracker = cv2.TrackerCSRT_create()
+        # self.tracker = cv2.TrackerKCF_create()
+        # self.tracker = cv2.TrackerMIL_create()
+        self.tracker.init(frame, bbox)
+
+    def update_tracker(self, image, index, **kwargs):
+        success, bbox = self.tracker.update(image)
+        if not success:
+            self.active=False
+            return
+
+        x, y, w, h = map(int, bbox)
+        bbox_center = x + w / 2, y + h / 2
+        self.tracked_coordinates[index] = bbox_center
+
+        return bbox_center
+
+    def display_tracking_solution(self, window_name, image: np.ndarray, solution: Any, **kwargs):
+        x, y = map(int, solution)
+        cv2.circle(image, (x, y), 5, (0, 255, 0), 5)
 
         cv2.imshow(window_name, image)
         cv2.waitKey(1)
