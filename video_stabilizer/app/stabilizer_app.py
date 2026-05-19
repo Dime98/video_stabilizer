@@ -1,15 +1,17 @@
 import cv2
 import numpy as np
 
-from video_stabilizer.helpers.helpers import ViewColorMasking
+
 from video_stabilizer.rendering_ui.display import (
     DisplayManager,
     DrawingRelatedProperties,
 )
 from video_stabilizer.trackers.trackers import Tracker, EmptyTracker
-from misc_functions.utils import convert_image
+from video_stabilizer.cv2_utils.utils import convert_image
 from video_stabilizer.video.render_video import VideoRenderer
 from video_stabilizer.video.video_metadata import VideoMetadata
+
+from video_stabilizer.helpers.helpers import ViewColorMasking
 
 
 class InputHandler:
@@ -55,9 +57,7 @@ class InputHandler:
         }
         key_code_max_len = max([len(str(key)) for key in self.inputs_mapper]) + 2
         key_repr_max_len = max([len(str(key)) for key in SPECIAL_KEYS.values()]) + 4
-        funct_max_len = max(
-            [len(str(function.__name__)) for function in self.inputs_mapper.values()]
-        )
+        funct_max_len = max([len(str(function.__name__)) for function in self.inputs_mapper.values()])
 
         print("-" * 50)
         for key_code, function in self.inputs_mapper.items():
@@ -81,11 +81,8 @@ class StabilizerApplication:
 
         self.active_tracker: Tracker = EmptyTracker()
         self.debug_display = False
-        self.debug_display = True
 
-        drawing_properties = DrawingRelatedProperties.from_video_metadate(
-            self.video_metadata
-        )
+        drawing_properties = DrawingRelatedProperties.from_video_metadate(self.video_metadata)
         self.display = DisplayManager(
             drawing_properties=drawing_properties,
             frames=self.frames,
@@ -106,22 +103,27 @@ class StabilizerApplication:
         )
         self.keybindings.show_commands()
 
-    def __del__(self):
+    def close(self):
         cv2.destroyAllWindows()
+        self.active_tracker.close()
 
     def render_op(self, **kwargs):
+        if self.display.drawing_properties.pin_coord is None:
+            print("pin is not set, run tracker and press 'p'")
+            return
+
         self.display.dim_display_window()
 
         stem = self.video_metadata.video_path.stem
         props_as_str = self.display.drawing_properties.get_props_for_output_path()
-        output_path = self.video_metadata.video_path.with_stem(
-            stem + "_stb" + props_as_str
-        )
-        self.video_renderer.render_stabilized(
-            output_video_path=output_path, tracker=self.active_tracker
-        )
+        output_path = self.video_metadata.video_path.with_stem(stem + "_stb" + props_as_str)
+        self.video_renderer.render_stabilized(output_video_path=output_path, tracker=self.active_tracker)
 
     def render_all_axis(self, **kwargs):
+        if self.display.drawing_properties.pin_coord is None:
+            print("pin is not set, run tracker and press 'p'")
+            return
+
         self.display.dim_display_window()
 
         current_lock_axis = cv2.getTrackbarPos("lock_axis", self.display.timeline)
@@ -129,12 +131,8 @@ class StabilizerApplication:
             cv2.setTrackbarPos("lock_axis", self.display.timeline, i)
             stem = self.video_metadata.video_path.stem
             props_as_str = self.display.drawing_properties.get_props_for_output_path()
-            output_path = self.video_metadata.video_path.with_stem(
-                stem + "_stb" + props_as_str
-            )
-            self.video_renderer.render_stabilized(
-                output_video_path=output_path, tracker=self.active_tracker
-            )
+            output_path = self.video_metadata.video_path.with_stem(stem + "_stb" + props_as_str)
+            self.video_renderer.render_stabilized(output_video_path=output_path, tracker=self.active_tracker)
         cv2.setTrackbarPos("lock_axis", self.display.timeline, current_lock_axis)
 
     def start_tracker_method(self, *args, **kwargs):
@@ -179,9 +177,7 @@ class StabilizerApplication:
 
         self.display.dim_display_window()
 
-        forward_range = range(
-            self.display.current_frame_index, self.video_metadata.frames_count
-        )
+        forward_range = range(self.display.current_frame_index, self.video_metadata.frames_count)
         backward_range = range(self.display.current_frame_index - 1, -1, -1)
 
         print("\n-- tracking --")
@@ -199,18 +195,14 @@ class StabilizerApplication:
                 debug_display_frame = np.copy(image_for_tracking)
                 current_gray = convert_image(debug_display_frame, "gray")
 
-                coordinates = tracker.update_tracker(
-                    image=image_for_tracking, gray_image=current_gray, index=index
-                )
+                coordinates = tracker.update_tracker(image=image_for_tracking, gray_image=current_gray, index=index)
 
                 # TODO lost track but still not all frames are passed
                 if not tracker.active:
                     break
 
                 if self.debug_display:
-                    tracker.display_tracking_solution(
-                        debug_window_name, debug_display_frame, coordinates
-                    )
+                    tracker.display_tracking_solution(debug_window_name, debug_display_frame, coordinates)
 
         if self.debug_display:
             cv2.destroyWindow(debug_window_name)
@@ -226,13 +218,11 @@ class StabilizerApplication:
         self.active_tracker = tracker
         tracker.sort_tracker_data()
 
-        self.display.set_pin(
-            coord=tracker.tracked_coordinates[self.display.current_frame_index]
-        )
+        self.display.set_pin(coord=tracker.tracked_coordinates[self.display.current_frame_index])
         print("done tracking\n")
 
     def stabilize(self):
-        """main loop"""
+        """Main loop"""
         if not self.frames:
             return
 
@@ -247,9 +237,7 @@ class StabilizerApplication:
                 _tracked_coordinates = self.active_tracker.convolve_smooth(
                     self.display.drawing_properties.kernel_win_size
                 )
-                current_coord_center = _tracked_coordinates[
-                    self.display.current_frame_index
-                ].flatten()
+                current_coord_center = _tracked_coordinates[self.display.current_frame_index].flatten()
                 warp_affine = {
                     "current_coord_center": current_coord_center,
                     "tracked_coordinates": _tracked_coordinates,

@@ -27,7 +27,3 @@ class VideoMetadata:
 
         video_capture.release()
         return metadata
-
-    def __repr__(self):
-        print(f"wxh: {self.width} {self.height}")
-        print(f"fps: {self.fps}")

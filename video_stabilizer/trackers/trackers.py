@@ -3,7 +3,7 @@ from typing import Any
 
 import cv2
 import numpy as np
-from misc_functions.utils import convert_image
+from video_stabilizer.cv2_utils.utils import convert_image
 
 
 class Tracker(ABC):
@@ -12,6 +12,9 @@ class Tracker(ABC):
         self._valid = False
         self.tracked_coordinates = {}
         self.requires_roi = True
+
+    def close(self):
+        del self.tracked_coordinates
 
     @property
     def active(self):
@@ -39,24 +42,17 @@ class Tracker(ABC):
             raise ValueError(f"'{method}' is not an option")
 
     @abstractmethod
-    def initialize_tracker(self, **kwargs):
-        ...
+    def initialize_tracker(self, **kwargs): ...
 
     @abstractmethod
-    def update_tracker(self, image, index):
-        ...
+    def update_tracker(self, image, index): ...
 
     @abstractmethod
-    def display_tracking_solution(
-            self, window_name, image: np.ndarray, solution: Any, **kwargs
-    ):
-        ...
+    def display_tracking_solution(self, window_name, image: np.ndarray, solution: Any, **kwargs): ...
 
     def sort_tracker_data(self):
         self.tracked_coordinates = dict(sorted(self.tracked_coordinates.items()))
-        self.tracked_coordinates = np.array(
-            list(self.tracked_coordinates.values())
-        ).squeeze()
+        self.tracked_coordinates = np.array(list(self.tracked_coordinates.values())).squeeze()
 
     def get_coordinate_at_index(self, index):
         return self.tracked_coordinates[index]
@@ -100,8 +96,6 @@ class ColorMasking(Tracker):
     def initialize_tracker(self, **kwargs): ...
 
     def get_mask(self, image):
-        # if self.lower == [] or self.upper == []:
-        #     raise ValueError(f"lower or upped bounds are not set\n{self.lower=} {self.upper=} ")
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
         lower = np.array(self.lower)
@@ -109,9 +103,7 @@ class ColorMasking(Tracker):
         return cv2.inRange(hsv, lower, upper)
 
     def get_contours(self, bw_image: np.ndarray, min_area: int = 30):
-        contours, hierarchy = cv2.findContours(
-            bw_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-        )
+        contours, hierarchy = cv2.findContours(bw_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         contours = [cnt for cnt in contours if cv2.contourArea(cnt) >= min_area]
         return contours
 
@@ -134,9 +126,7 @@ class ColorMasking(Tracker):
 
     def fix_roi_offset(self, x, y, w, h): ...
 
-    def display_tracking_solution(
-            self, window_name, image: np.ndarray, solution: Any, **kwargs
-    ):
+    def display_tracking_solution(self, window_name, image: np.ndarray, solution: Any, **kwargs):
         mask = self.get_mask(image)
 
         contours = self.get_contours(mask)
@@ -155,9 +145,7 @@ class OpticalFlow(Tracker):
     def __init__(self, feature_params):
         super().__init__()
         if feature_params is None:
-            self.feature_params = dict(
-                maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7
-            )
+            self.feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
         else:
             self.feature_params = feature_params
 
@@ -169,6 +157,11 @@ class OpticalFlow(Tracker):
         self.p0 = None
         self._old_gray = None
 
+    def close(self):
+        super().close()
+        del self._old_gray
+        del self.p0
+
     @property
     def old_gray(self):
         return self._old_gray
@@ -178,10 +171,10 @@ class OpticalFlow(Tracker):
         self._old_gray = val
 
     def initialize_tracker(self, **kwargs):
-        x, y, w, h = kwargs['roi']
-        frame = kwargs['frame']
+        x, y, w, h = kwargs["roi"]
+        frame = kwargs["frame"]
 
-        roi_image = frame[y: y + h, x: x + w]
+        roi_image = frame[y : y + h, x : x + w]
         roi_image = convert_image(roi_image, "gray")
 
         init_tracker_image = convert_image(roi_image, "gray")
@@ -210,7 +203,6 @@ class OpticalFlow(Tracker):
             self.active = False
             return
 
-        # good_points = p1[st]
         good_points = p1[st.flatten() == 1]
 
         self.old_gray = image
@@ -220,9 +212,7 @@ class OpticalFlow(Tracker):
         self.tracked_coordinates[index] = good_points_mean
         return good_points_mean  # return for debugging purposes
 
-    def display_tracking_solution(
-            self, window_name, image: np.ndarray, solution: Any, **kwargs
-    ):
+    def display_tracking_solution(self, window_name, image: np.ndarray, solution: Any, **kwargs):
         for coordinate in solution:
             x, y = map(int, coordinate.ravel())
             cv2.circle(image, (x, y), 5, (0, 255, 0), 5)
@@ -236,9 +226,13 @@ class CV2Tracker(Tracker):
         super().__init__()
         self.tracker = None
 
+    def close(self):
+        super().close()
+        del self.tracker
+
     def initialize_tracker(self, **kwargs):
-        bbox = kwargs['roi']
-        frame = kwargs['frame']
+        bbox = kwargs["roi"]
+        frame = kwargs["frame"]
 
         self.tracker = cv2.TrackerCSRT_create()
         # self.tracker = cv2.TrackerKCF_create()
@@ -248,7 +242,7 @@ class CV2Tracker(Tracker):
     def update_tracker(self, image, index, **kwargs):
         success, bbox = self.tracker.update(image)
         if not success:
-            self.active=False
+            self.active = False
             return
 
         x, y, w, h = map(int, bbox)
@@ -257,7 +251,13 @@ class CV2Tracker(Tracker):
 
         return bbox_center
 
-    def display_tracking_solution(self, window_name, image: np.ndarray, solution: Any, **kwargs):
+    def display_tracking_solution(
+        self,
+        window_name,
+        image: np.ndarray,
+        solution: Any,
+        **kwargs,
+    ):
         x, y = map(int, solution)
         cv2.circle(image, (x, y), 5, (0, 255, 0), 5)
 

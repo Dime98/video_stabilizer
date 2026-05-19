@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from utils import rescale
+from video_stabilizer.cv2_utils.utils import rescale
 
 from video_stabilizer.video.video_metadata import VideoMetadata
 
@@ -35,36 +35,21 @@ class ViewColorMasking:
         self.index = value
 
     def create_sliders(self):
-        time_line_max = (
-            0 if self.frames is None else self.video_metadata.frames_count - 1
-        )
+        time_line_max = 0 if self.frames is None else self.video_metadata.frames_count - 1
         cv2.createTrackbar("", self.window_name, 0, 1, self.on_change)
         cv2.setTrackbarMax("", self.window_name, time_line_max)
 
-        cv2.createTrackbar(
-            "h_min", self.window_name, self.h_min, 179, lambda *args: None
-        )
-        cv2.createTrackbar(
-            "h_max", self.window_name, self.h_max, 179, lambda *args: None
-        )
+        cv2.createTrackbar("h_min", self.window_name, self.h_min, 179, lambda *args: None)
+        cv2.createTrackbar("h_max", self.window_name, self.h_max, 179, lambda *args: None)
 
-        cv2.createTrackbar(
-            "s_min", self.window_name, self.s_min, 255, lambda *args: None
-        )
-        cv2.createTrackbar(
-            "s_max", self.window_name, self.s_max, 255, lambda *args: None
-        )
+        cv2.createTrackbar("s_min", self.window_name, self.s_min, 255, lambda *args: None)
+        cv2.createTrackbar("s_max", self.window_name, self.s_max, 255, lambda *args: None)
 
-        cv2.createTrackbar(
-            "v_min", self.window_name, self.v_min, 255, lambda *args: None
-        )
-        cv2.createTrackbar(
-            "v_max", self.window_name, self.v_max, 255, lambda *args: None
-        )
+        cv2.createTrackbar("v_min", self.window_name, self.v_min, 255, lambda *args: None)
+        cv2.createTrackbar("v_max", self.window_name, self.v_max, 255, lambda *args: None)
 
     def mask(self, image, min_values, max_values):
-        """
-        min_values  [h_min, s_min, v_min]
+        """min_values  [h_min, s_min, v_min]
         min_values  [h_max, s_max, v_max]
         """
         hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
@@ -99,9 +84,7 @@ class ViewColorMasking:
             mask = self.mask(image, lower, upper)
             image[mask == 0] = (0, 0, 0)
 
-            concatenated_images = cv2.hconcat(
-                [image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)]
-            )
+            concatenated_images = cv2.hconcat([image, cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)])
             if self.rescale_factor:
                 concatenated_images = rescale(concatenated_images, self.rescale_factor)
             cv2.imshow("color mask viewer", concatenated_images)
@@ -206,16 +189,12 @@ class GoodFeaturesViewer:
                 parameter_data["onChange"],
             )
             if parameter_data.get("min"):
-                cv2.setTrackbarMin(
-                    parameter_name, self._window_name, parameter_data["min"]
-                )
+                cv2.setTrackbarMin(parameter_name, self._window_name, parameter_data["min"])
 
     def parses_parameters(self):
         if not self.active:
             return
-        parsed_parameters = {
-            param: param_data["value"] for param, param_data in self._parameters.items()
-        }
+        parsed_parameters = {param: param_data["value"] for param, param_data in self._parameters.items()}
         parsed_parameters["qualityLevel"] /= 100
         return parsed_parameters
 

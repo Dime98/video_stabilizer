@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 from screeninfo import get_monitors
 
-from utils import rescale
+from video_stabilizer.cv2_utils.utils import rescale
 from video_stabilizer.trackers.trackers import Tracker
 from video_stabilizer.video.video_metadata import VideoMetadata
 
@@ -23,9 +23,7 @@ class DrawingRelatedProperties:
     def from_video_metadate(cls, video_metadata: VideoMetadata):
         return cls(
             track_trail_thickness=int(video_metadata.width * 0.01),
-            circle_thickness=int(
-                max(video_metadata.width, video_metadata.height) * 0.003
-            ),
+            circle_thickness=int(max(video_metadata.width, video_metadata.height) * 0.003),
             draw_cross=False,
             lock_axis=1,
             pin_coord=None,
@@ -34,15 +32,14 @@ class DrawingRelatedProperties:
         )
 
     def get_locked_axis(self):
-        """
-        as slider has 2 position its is mapped like this
+        """As slider has 2 position its is mapped like this
         [locker_x, no_lock, locker_y]
         """
         lock_axis_mapping = {0: 0, 1: None, 2: 1}
         return lock_axis_mapping.get(self.lock_axis)
 
     def get_props_for_output_path(self):
-        """creates string to append to rendered video path"""
+        """Creates string to append to rendered video path"""
         lock_axis = self.get_locked_axis()
         lock_axis = f"_locked_axis_{lock_axis}" if lock_axis is not None else ""
         kernel_win_size = self.kernel_win_size
@@ -102,9 +99,7 @@ class DisplayManager:
         cv2.createTrackbar("lock_axis", self.timeline, 1, 1, self.on_lock_axis)
         cv2.setTrackbarMax("lock_axis", self.timeline, 2)
 
-        cv2.createTrackbar(
-            "conv_smooth", self.timeline, 1, 1, self.on_convolve_coordinates
-        )
+        cv2.createTrackbar("conv_smooth", self.timeline, 1, 1, self.on_convolve_coordinates)
         cv2.setTrackbarMax("conv_smooth", self.timeline, 20)
         cv2.setTrackbarMin("conv_smooth", self.timeline, 1)
 
@@ -136,9 +131,7 @@ class DisplayManager:
         direction = self._manual_movement.get(kwargs["key"])
         if direction is None:
             return
-        self.drawing_properties.pin_coord = (
-            self.drawing_properties.pin_coord + direction * _stride
-        )
+        self.drawing_properties.pin_coord = self.drawing_properties.pin_coord + direction * _stride
 
     def set_pin(self, *args, **kwargs):
         coord = kwargs.get("coord")  # on end of track
@@ -178,18 +171,12 @@ class DisplayManager:
         # TODO think of what best len is
         length = self.video_metadata.frames_count
 
-        coord_indices = np.arange(
-            self.current_frame_index - length, self.current_frame_index
-        )
+        coord_indices = np.arange(self.current_frame_index - length, self.current_frame_index)
         valid_indices = coord_indices[coord_indices >= 0]
 
-        line_thickness = np.linspace(
-            1, self.drawing_properties.track_trail_thickness, length
-        )
+        line_thickness = np.linspace(1, self.drawing_properties.track_trail_thickness, length)
         color_gradients = np.linspace(100, 255, length).astype(np.uint8)
-        _zip = zip(
-            valid_indices[1:], valid_indices[:-1], line_thickness, color_gradients
-        )
+        _zip = zip(valid_indices[1:], valid_indices[:-1], line_thickness, color_gradients)
         for before, after, _line_thickness, color_gradient in _zip:
             cv2.line(
                 img=image,
@@ -226,7 +213,7 @@ class DisplayManager:
         )
 
     def dim_display_window(self):
-        """dim display image while doing ops"""
+        """Dim display image while doing ops"""
         self.show_frame((self.get_current_frame() * 0.5).astype(np.uint8))
         cv2.waitKey(1)
 
@@ -234,7 +221,7 @@ class DisplayManager:
         return np.copy(self.frames[self.current_frame_index])
 
     def show_frame(self, frame=None, warp=None) -> np.ndarray:
-        """displays rescaled frame"""
+        """Displays rescaled frame"""
         frame = frame if frame is not None else self.get_current_frame()
 
         if warp:

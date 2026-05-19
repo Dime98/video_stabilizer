@@ -2,7 +2,7 @@ from pathlib import Path
 
 import cv2
 
-from misc_functions.utils import get_video_writer
+from video_stabilizer.cv2_utils.utils import get_video_writer
 from video_stabilizer.rendering_ui.display import DisplayManager
 from video_stabilizer.trackers.trackers import Tracker
 from video_stabilizer.video.video_metadata import VideoMetadata
@@ -10,10 +10,10 @@ from video_stabilizer.video.video_metadata import VideoMetadata
 
 class VideoRenderer:
     def __init__(
-            self,
-            video_metadata: VideoMetadata,
-            display_manager: DisplayManager,
-            fourcc: str = "FFV1",
+        self,
+        video_metadata: VideoMetadata,
+        display_manager: DisplayManager,
+        fourcc: str = "FFV1",
     ):
         self.display_manager = display_manager
         self.video_metadata = video_metadata
@@ -24,9 +24,7 @@ class VideoRenderer:
             "MJPG": ".avi",
         }
         if not self.fourcc_mapping.get(fourcc):
-            raise ValueError(
-                f"Unsupported {fourcc=}, use one of following {list(self.fourcc_mapping.keys())}"
-            )
+            raise ValueError(f"Unsupported {fourcc=}, use one of following {list(self.fourcc_mapping.keys())}")
         self.fourcc = fourcc
 
     def extension_according_to_fourcc(self, full_path: Path):
