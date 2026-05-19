@@ -61,7 +61,6 @@ class ViewColorMasking:
 
     def view(self, image=None):
         cv2.namedWindow(self.window_name)
-        # cv2.resizeWindow(self._timeline, int(self._monitor_width * 0.8), 100)
         self.create_sliders()
 
         if self.frames is None:

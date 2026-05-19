@@ -1,7 +1,5 @@
-from time import perf_counter  # noqa: F401
-
 import cv2
-import numpy as np  # noqa: F401
+import numpy as np
 
 KERNEL_1X1 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 1))
 KERNEL_3X3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))

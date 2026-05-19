@@ -235,8 +235,6 @@ class CV2Tracker(Tracker):
         frame = kwargs["frame"]
 
         self.tracker = cv2.TrackerCSRT_create()
-        # self.tracker = cv2.TrackerKCF_create()
-        # self.tracker = cv2.TrackerMIL_create()
         self.tracker.init(frame, bbox)
 
     def update_tracker(self, image, index, **kwargs):

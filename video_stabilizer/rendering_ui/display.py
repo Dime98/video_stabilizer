@@ -94,7 +94,6 @@ class DisplayManager:
         cv2.namedWindow(self.timeline, cv2.WINDOW_NORMAL)
         cv2.createTrackbar("", self.timeline, 0, 1, self.on_change)
         cv2.setTrackbarMax("", self.timeline, self.video_metadata.frames_count - 1)
-        # cv2.resizeWindow(self.timeline, int(self._monitor_width * 0.8), 100)
 
         cv2.createTrackbar("lock_axis", self.timeline, 1, 1, self.on_lock_axis)
         cv2.setTrackbarMax("lock_axis", self.timeline, 2)

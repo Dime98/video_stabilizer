@@ -1,17 +1,15 @@
 import cv2
 import numpy as np
 
-
-from video_stabilizer.rendering_ui.display import (
+from helpers.helpers import ViewColorMasking
+from rendering_ui.display import (
     DisplayManager,
     DrawingRelatedProperties,
 )
-from video_stabilizer.trackers.trackers import Tracker, EmptyTracker
-from video_stabilizer.cv2_utils.utils import convert_image
+from trackers.trackers import Tracker, EmptyTracker
+from cv2_utils.utils import convert_image
 from video_stabilizer.video.render_video import VideoRenderer
 from video_stabilizer.video.video_metadata import VideoMetadata
-
-from video_stabilizer.helpers.helpers import ViewColorMasking
 
 
 class InputHandler:
@@ -102,16 +100,10 @@ class StabilizerApplication:
         )
         self.keybindings.show_commands()
 
-    def close(self):
+    def __del__(self):
         cv2.destroyAllWindows()
-        self.active_tracker.close()
-        del self.frames
 
     def render_op(self, **kwargs):
-        if self.display.drawing_properties.pin_coord is None:
-            print("pin is not set, run tracker and press 'p'")
-            return
-
         self.display.dim_display_window()
 
         stem = self.video_metadata.video_path.stem
@@ -120,10 +112,6 @@ class StabilizerApplication:
         self.video_renderer.render_stabilized(output_video_path=output_path, tracker=self.active_tracker)
 
     def render_all_axis(self, **kwargs):
-        if self.display.drawing_properties.pin_coord is None:
-            print("pin is not set, run tracker and press 'p'")
-            return
-
         self.display.dim_display_window()
 
         current_lock_axis = cv2.getTrackbarPos("lock_axis", self.display.timeline)
