@@ -25,7 +25,7 @@ class ViewColorMasking:
 
     def reset_sliders(self):
         cv2.setTrackbarPos("h_min", self.window_name, 0)
-        cv2.setTrackbarPos("h_max", self.window_name, 170)
+        cv2.setTrackbarPos("h_max", self.window_name, 179)
         cv2.setTrackbarPos("s_min", self.window_name, 0)
         cv2.setTrackbarPos("s_max", self.window_name, 255)
         cv2.setTrackbarPos("v_min", self.window_name, 0)
